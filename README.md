@@ -26,3 +26,7 @@ selling=true
 The app is intended to be a quick and dirty hack for getting the job done. You
 will most likely need to modify output fields and/or some logic based on how you
 want to see things.
+
+# License
+
+Do whatever the hell you want.
