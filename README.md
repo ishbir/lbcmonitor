@@ -23,6 +23,12 @@ firstPage="https://localbitcoins.com/sell-bitcoins-online/sepa-eu-bank-transfer/
 selling=true
 ```
 
+Compile the app and run it as `lbcmonitor --help` to see help arguments. There
+are two modes of operation. One is to track the price of Bitcoin and report the
+most favourable values (prices higher than threshold specified by --xbtprice if
+selling, and lower if buying). The second is to automatically calculate the rate
+from the given values of fiat and XBT and report good deals.
+
 The app is intended to be a quick and dirty hack for getting the job done. You
 will most likely need to modify output fields and/or some logic based on how you
 want to see things.
