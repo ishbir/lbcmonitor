@@ -12,15 +12,16 @@ import (
 )
 
 const (
-	firstPage = "https://localbitcoins.com/buy-bitcoins-online/US/united-states/cash-deposit/.json"
-	selling   = false
+	sellPage = "https://localbitcoins.com/sell-bitcoins-online/US/united-states/cash-deposit/.json"
+	buyPage  = "https://localbitcoins.com/buy-bitcoins-online/US/united-states/cash-deposit/.json"
 )
 
 type Options struct {
+	Buying       bool    `long:"buy" description:"Switch to buying mode instead of selling."`
 	XBTAmount    float64 `long:"xbt" description:"Amount of XBT that requires conversion to fiat."`
 	FiatAmount   float64 `long:"fiat" description:"Amount of fiat needed from the conversion of given XBT."`
 	XBTPrice     float64 `long:"xbtprice" description:"Price of 1 XBT that the software should alert at."`
-	Pages        uint    `long:"pages" description:"Number of pages to follow."`
+	Pages        uint    `long:"pages" description:"Number of pages to follow. Default 5."`
 	priceMonitor bool
 }
 
@@ -48,31 +49,36 @@ func main() {
 		os.Exit(1)
 	}
 	if opts.Pages == 0 {
-		opts.Pages = 2
+		opts.Pages = 5
 	}
 
 	// Format in tab-separated columns with a tab stop of 8.
 	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
-
-	process(firstPage)
+	fmt.Fprintln(w, "Rate\tMin\tMax\tBanks\tLink")
+	fmt.Fprintln(w, "----\t---\t---\t-----\t----")
+	if opts.Buying {
+		process(buyPage)
+	} else {
+		process(sellPage)
+	}
 	w.Flush()
 }
 
 func process(jsonURL string) {
 	res, err := http.Get(jsonURL)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "got HTTP error %v", err)
+		fmt.Fprintf(os.Stderr, "got HTTP error %v\n", err)
 		os.Exit(1)
 	}
 	if res.StatusCode != 200 {
-		fmt.Fprintf(os.Stderr, "got status code %d", res.StatusCode)
+		fmt.Fprintf(os.Stderr, "got status code %d\n", res.StatusCode)
 		os.Exit(1)
 	}
 	m := new(MainJson)
 	err = json.NewDecoder(res.Body).Decode(m)
 	res.Body.Close()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "json decode failed: %v", err)
+		fmt.Fprintf(os.Stderr, "json decode failed: %v\n", err)
 		os.Exit(1)
 
 	}
@@ -83,18 +89,18 @@ func process(jsonURL string) {
 		if ad.Data.MaxAmount != "" {
 			maxAmount, err = strconv.ParseFloat(ad.Data.MaxAmount, 64)
 			if err != nil {
-				log.Printf("maxAmount decode for ad #%d failed: %v", i, err)
+				log.Printf("maxAmount decode for ad #%d failed: %v\n", i, err)
 			}
 		}
 		if ad.Data.MinAmount != "" {
 			minAmount, err = strconv.ParseFloat(ad.Data.MinAmount, 64)
 			if err != nil {
-				log.Printf("minAmount decode for ad #%d failed: %v", i, err)
+				log.Printf("minAmount decode for ad #%d failed: %v\n", i, err)
 			}
 		}
 		price, err := strconv.ParseFloat(ad.Data.Price, 64)
 		if err != nil {
-			log.Printf("price decode for ad #%d failed: %v", i, err)
+			log.Printf("price decode for ad #%d failed: %v\n", i, err)
 		}
 
 		bankName := ad.Data.BankName
@@ -102,13 +108,14 @@ func process(jsonURL string) {
 
 		if opts.priceMonitor {
 			var cond bool
-			if selling { // want highest selling price
+			if !opts.Buying { // want highest selling price
 				cond = price >= opts.XBTPrice
 			} else { // want lowest selling price
 				cond = price <= opts.XBTPrice
 			}
 			if cond {
-				fmt.Fprintf(w, "%.2f\t%s\t%s\n", price, bankName, url)
+				fmt.Fprintf(w, "%.2f\t%.0f\t%.0f\t%s\t%s\n", price, minAmount,
+					maxAmount, bankName, url)
 			}
 		} else {
 			if maxAmount < opts.FiatAmount {
@@ -120,14 +127,15 @@ func process(jsonURL string) {
 			calcFiat := opts.XBTAmount * price
 
 			var cond bool
-			if selling { // want max fiat
+			if !opts.Buying { // want max fiat
 				cond = calcFiat >= opts.FiatAmount
 			} else { // want lowest fiat
 				cond = calcFiat <= opts.FiatAmount
 			}
 
 			if cond {
-				fmt.Fprintf(w, "%.2f\t%s\t%s\n", price, bankName, url)
+				fmt.Fprintf(w, "%.2f\t%.0f\t%.0f\t%s\t%s\n", price, minAmount,
+					maxAmount, bankName, url)
 			}
 		}
 	}
